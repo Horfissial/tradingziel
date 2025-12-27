@@ -3,30 +3,58 @@ const SUPABASE_URL = 'https://uorvuwswypswouceexkd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcnZ1d3N3eXBzd291Y2VleGtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4MDc5NzQsImV4cCI6MjA4MjM4Mzk3NH0.AbBlJx0B1-vdVHHy79ZKlXl9hNl_AfFnRV5xLzKAwus';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- STATE MANAGEMENT ---
+// --- INIT ---
+let supabase;
 let userSession = null;
 let allTrades = [];
-let charts = {}; // Store chart instances to destroy them before re-rendering
+let charts = {};
 
-// --- INITIALIZATION ---
 window.addEventListener('load', async () => {
-    feather.replace();
-    
-    // Check Auth State
-    const { data: { session } } = await supabase.auth.getSession();
-    handleAuthChange(session);
+    // 1. Initialize Supabase
+    if (typeof window.supabase === 'undefined') {
+        alert("Supabase SDK failed to load. Check your internet connection.");
+        return;
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Listen for Auth Changes
-    supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Initialize Icons
+    if (typeof feather !== 'undefined') feather.replace();
+
+    // 3. Check Session
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
         handleAuthChange(session);
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+            handleAuthChange(session);
+        });
+    } catch (e) {
+        console.error("Auth Init Error:", e);
+    }
+
+    // 4. Mobile Menu Logic
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    if(menuBtn) {
+        menuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+    }
+    // Close sidebar when clicking a link on mobile
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if(window.innerWidth <= 768) sidebar.classList.remove('open');
+        });
     });
 
-    // Set current datetime for trade form
+    // 5. Set Date
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    document.getElementById('trade_datetime').value = now.toISOString().slice(0, 16);
+    const dateInput = document.getElementById('trade_datetime');
+    if(dateInput) dateInput.value = now.toISOString().slice(0, 16);
 });
 
+// --- AUTH ---
 function handleAuthChange(session) {
     userSession = session;
     if (session) {
@@ -40,20 +68,36 @@ function handleAuthChange(session) {
     }
 }
 
-// --- AUTH ACTIONS ---
 document.getElementById('login-btn').addEventListener('click', async () => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    const errorBox = document.getElementById('auth-error');
+    
+    errorBox.classList.add('hidden');
+    if(!email || !password) return alert("Please enter email and password");
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
+    if (error) {
+        errorBox.innerText = error.message;
+        errorBox.classList.remove('hidden');
+    }
 });
 
 document.getElementById('signup-btn').addEventListener('click', async () => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    const errorBox = document.getElementById('auth-error');
+
+    errorBox.classList.add('hidden');
+    if(!email || !password) return alert("Please enter email and password");
+
     const { error } = await supabase.auth.signUp({ email, password });
-    if (error) alert(error.message);
-    else alert('Check your email for the confirmation link!');
+    if (error) {
+        errorBox.innerText = error.message;
+        errorBox.classList.remove('hidden');
+    } else {
+        alert('Account created! You can now log in.');
+    }
 });
 
 async function handleLogout() {
@@ -62,23 +106,19 @@ async function handleLogout() {
 
 // --- NAVIGATION ---
 function showSection(sectionId) {
-    // Hide all sections
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
     document.getElementById('trade-form-section').classList.add('hidden');
-    
-    // Show target
     document.getElementById(sectionId).classList.remove('hidden');
 
-    // Update Sidebar
+    // Update Sidebar Active State
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    // Find the nav item that calls this function (rough approximation)
-    const navItems = document.querySelectorAll('.nav-item');
-    if(sectionId === 'dashboard') navItems[0].classList.add('active');
-    if(sectionId === 'logs') navItems[2].classList.add('active');
-    if(sectionId === 'review') navItems[3].classList.add('active');
-    if(sectionId === 'strategy') navItems[4].classList.add('active');
+    // Simple logic to highlight correct tab
+    const navs = document.querySelectorAll('.nav-item');
+    if(sectionId === 'dashboard') navs[0].classList.add('active');
+    if(sectionId === 'logs') navs[2].classList.add('active');
+    if(sectionId === 'review') navs[3].classList.add('active');
+    if(sectionId === 'strategy') navs[4].classList.add('active');
 
-    // Load Data
     if (sectionId === 'dashboard') loadDashboard();
     if (sectionId === 'logs') loadLogs();
     if (sectionId === 'review') loadReview();
@@ -87,365 +127,239 @@ function showSection(sectionId) {
 
 // --- DATA FETCHING ---
 async function fetchTrades() {
+    if(!userSession) return [];
     const { data, error } = await supabase
         .from('trades')
         .select('*')
         .order('trade_datetime', { ascending: false });
     
-    if (error) {
-        console.error(error);
-        return [];
-    }
+    if (error) { console.error(error); return []; }
     allTrades = data;
     return data;
 }
 
-// --- DASHBOARD LOGIC ---
+// --- DASHBOARD ---
 async function loadDashboard() {
     const trades = await fetchTrades();
-    
-    // Calculate Stats
-    const totalTrades = trades.length;
     const wins = trades.filter(t => t.trade_outcome === 'Win').length;
-    const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
-    
-    const pnl = trades.reduce((acc, t) => acc + (parseFloat(t.profit_loss) || 0), 0);
-    
-    const followedPlanCount = trades.filter(t => t.followed_plan).length;
-    const adherence = totalTrades > 0 ? Math.round((followedPlanCount / totalTrades) * 100) : 0;
+    const total = trades.length;
+    const winRate = total > 0 ? Math.round((wins/total)*100) : 0;
+    const pnl = trades.reduce((acc, t) => acc + (parseFloat(t.profit_loss)||0), 0);
+    const followed = trades.filter(t => t.followed_plan).length;
+    const adherence = total > 0 ? Math.round((followed/total)*100) : 0;
 
-    // Update DOM
     document.getElementById('dash-winrate').innerText = `${winRate}%`;
     document.getElementById('dash-pnl').innerText = `$${pnl.toFixed(2)}`;
     document.getElementById('dash-pnl').style.color = pnl >= 0 ? '#10b981' : '#ef4444';
     document.getElementById('dash-adherence').innerText = `${adherence}%`;
-    document.getElementById('dash-total').innerText = totalTrades;
-    document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    document.getElementById('dash-total').innerText = total;
+
+    const dateEl = document.getElementById('current-date');
+    if(dateEl) dateEl.innerText = new Date().toLocaleDateString();
 
     renderPnlChart(trades);
 }
 
 function renderPnlChart(trades) {
-    // Sort oldest to newest for chart
     const sorted = [...trades].sort((a,b) => new Date(a.trade_datetime) - new Date(b.trade_datetime));
-    let cumPnl = 0;
-    const dataPoints = sorted.map(t => {
-        cumPnl += (parseFloat(t.profit_loss) || 0);
-        return cumPnl;
-    });
+    let cum = 0;
+    const data = sorted.map(t => { cum += (parseFloat(t.profit_loss)||0); return cum; });
     const labels = sorted.map(t => new Date(t.trade_datetime).toLocaleDateString());
 
+    destroyChart('pnlChart');
     const ctx = document.getElementById('pnlChart').getContext('2d');
-    if (charts.pnl) charts.pnl.destroy();
-
-    charts.pnl = new Chart(ctx, {
+    charts.pnlChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
-                label: 'Cumulative P&L ($)',
-                data: dataPoints,
+                label: 'Cum. P&L',
+                data: data,
                 borderColor: '#3b82f6',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                tension: 0.4,
-                fill: true
+                fill: true,
+                tension: 0.3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { grid: { color: '#334155' } },
-                x: { grid: { display: false } }
-            }
+            scales: { y: { grid: { color: '#334155' } }, x: { display: false } },
+            plugins: { legend: { display: false } }
         }
     });
 }
 
-// --- STRATEGY LOGIC ---
+// --- STRATEGY ---
 async function loadStrategy() {
     const { data } = await supabase.from('user_strategy').select('strategy_content').single();
-    if (data) {
-        document.getElementById('strategy-editor').value = data.strategy_content;
+    if(document.getElementById('strategy-editor')) {
+        document.getElementById('strategy-editor').value = data ? data.strategy_content : "";
     }
 }
-
 async function saveStrategy() {
     const content = document.getElementById('strategy-editor').value;
-    
-    // Check if exists
     const { data: existing } = await supabase.from('user_strategy').select('id').single();
-    
     let error;
-    if (existing) {
-        ({ error } = await supabase.from('user_strategy').update({ strategy_content: content }).eq('user_id', userSession.user.id));
-    } else {
-        ({ error } = await supabase.from('user_strategy').insert({ user_id: userSession.user.id, strategy_content: content }));
-    }
-
+    if (existing) ({ error } = await supabase.from('user_strategy').update({ strategy_content: content }).eq('user_id', userSession.user.id));
+    else ({ error } = await supabase.from('user_strategy').insert({ user_id: userSession.user.id, strategy_content: content }));
+    
     if (error) alert('Error saving strategy');
     else alert('Strategy saved!');
 }
 
-// --- NEW TRADE FLOW ---
+// --- TRADE FORM ---
 async function openNewTradeModal() {
     const { data } = await supabase.from('user_strategy').select('strategy_content').single();
-    document.getElementById('modal-strategy-text').innerText = data ? data.strategy_content : "No strategy saved yet. Go to Strategy tab to add one.";
+    document.getElementById('modal-strategy-text').innerText = data ? data.strategy_content : "No strategy saved yet.";
     document.getElementById('strategy-modal').classList.remove('hidden');
     document.getElementById('confirm-strategy').checked = false;
     document.getElementById('btn-proceed').disabled = true;
 }
-
-function closeStrategyModal() {
-    document.getElementById('strategy-modal').classList.add('hidden');
-}
-
-function toggleProceedBtn() {
-    const checked = document.getElementById('confirm-strategy').checked;
-    document.getElementById('btn-proceed').disabled = !checked;
-}
-
+function closeStrategyModal() { document.getElementById('strategy-modal').classList.add('hidden'); }
+function toggleProceedBtn() { document.getElementById('btn-proceed').disabled = !document.getElementById('confirm-strategy').checked; }
 function proceedToTradeForm() {
     closeStrategyModal();
     document.getElementById('trade-form').reset();
     document.getElementById('trade-id').value = '';
-    document.getElementById('form-title').innerText = 'New Trade Entry';
-    calculatePlanAdherence(); // Reset indicator
-    
-    // Hide all, show form
+    document.getElementById('form-title').innerText = 'New Trade';
+    calculatePlanAdherence();
+    showSection('trade-form-section');
+    // Hide specific section header if needed or just rely on showSection logic
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
     document.getElementById('trade-form-section').classList.remove('hidden');
 }
+function cancelTradeForm() { showSection('dashboard'); }
 
-function cancelTradeForm() {
-    document.getElementById('trade-form-section').classList.add('hidden');
-    showSection('dashboard');
-}
-
-// --- PLAN ADHERENCE CALCULATION ---
 function calculatePlanAdherence() {
-    const liquidity = document.getElementById('liquidity_type').value;
-    const htfOb = document.getElementById('check_htf_imbalance_ob').checked;
-    const bos = document.getElementById('check_double_bos').checked;
-    const poi = document.getElementById('check_ltf_poi_sl').checked;
-
-    const isCompliant = liquidity !== "" && htfOb && bos && poi;
-    
-    const display = document.getElementById('plan-status-display');
-    if (isCompliant) {
-        display.innerHTML = '✓ Plan Followed';
-        display.className = 'plan-status-pass';
-    } else {
-        display.innerHTML = '✗ Plan Not Followed';
-        display.className = 'plan-status-fail';
-    }
-    return isCompliant;
+    const l = document.getElementById('liquidity_type').value;
+    const c1 = document.getElementById('check_htf_imbalance_ob').checked;
+    const c2 = document.getElementById('check_double_bos').checked;
+    const c3 = document.getElementById('check_ltf_poi_sl').checked;
+    const pass = l !== "" && c1 && c2 && c3;
+    const disp = document.getElementById('plan-status-display');
+    disp.innerHTML = pass ? '✓ Plan Followed' : '✗ Plan Not Followed';
+    disp.className = pass ? 'plan-status-pass' : 'plan-status-fail';
+    return pass;
 }
 
-// --- TRADE SUBMISSION ---
 async function handleTradeSubmit(e) {
     e.preventDefault();
-    const saveBtn = document.getElementById('save-trade-btn');
-    saveBtn.innerText = 'Saving...';
-    saveBtn.disabled = true;
-
+    const btn = document.getElementById('save-trade-btn');
+    btn.disabled = true; btn.innerText = 'Saving...';
+    
     try {
-        const followedPlan = calculatePlanAdherence();
-        const tradeId = document.getElementById('trade-id').value;
-        
-        // Handle Image Uploads (Simple sequential upload)
-        const uploadFile = async (fileInputId) => {
-            const file = document.getElementById(fileInputId).files[0];
-            if (!file) return null;
-            const fileName = `${userSession.user.id}/${Date.now()}_${file.name}`;
-            const { data, error } = await supabase.storage.from('trade-screenshots').upload(fileName, file);
-            if (error) throw error;
-            const { data: { publicUrl } } = supabase.storage.from('trade-screenshots').getPublicUrl(fileName);
-            return publicUrl;
-        };
-
-        const htfUrl = await uploadFile('file_htf');
-        const ltfUrl = await uploadFile('file_ltf');
-
         const tradeData = {
             user_id: userSession.user.id,
             trade_datetime: document.getElementById('trade_datetime').value,
             session: document.getElementById('session').value,
             symbol: document.getElementById('symbol').value,
             direction: document.getElementById('direction').value,
-            entry_price: document.getElementById('entry_price').value || null,
-            stop_loss: document.getElementById('stop_loss').value || null,
-            risk_amount: document.getElementById('risk_amount').value || null,
-            profit_loss: document.getElementById('profit_loss').value || null,
             trade_outcome: document.getElementById('trade_outcome').value,
+            profit_loss: document.getElementById('profit_loss').value || 0,
             liquidity_type: document.getElementById('liquidity_type').value,
             check_htf_imbalance_ob: document.getElementById('check_htf_imbalance_ob').checked,
             check_double_bos: document.getElementById('check_double_bos').checked,
             check_ltf_poi_sl: document.getElementById('check_ltf_poi_sl').checked,
-            followed_plan: followedPlan,
-            emotional_state: document.getElementById('emotional_state').value,
-            notes: document.getElementById('notes').value
+            followed_plan: calculatePlanAdherence()
         };
 
-        if (htfUrl) tradeData.htf_screenshot_url = htfUrl;
-        if (ltfUrl) tradeData.ltf_screenshot_url = ltfUrl;
-
+        const id = document.getElementById('trade-id').value;
         let error;
-        if (tradeId) {
-            ({ error } = await supabase.from('trades').update(tradeData).eq('id', tradeId));
-        } else {
-            ({ error } = await supabase.from('trades').insert(tradeData));
-        }
+        if(id) ({ error } = await supabase.from('trades').update(tradeData).eq('id', id));
+        else ({ error } = await supabase.from('trades').insert(tradeData));
 
-        if (error) throw error;
-        
-        alert('Trade saved successfully');
-        cancelTradeForm();
-        loadDashboard();
-
-    } catch (err) {
-        alert('Error: ' + err.message);
-        console.error(err);
+        if(error) throw error;
+        alert('Trade Saved');
+        showSection('dashboard');
+    } catch(err) {
+        alert(err.message);
     } finally {
-        saveBtn.innerText = 'Save Trade Log';
-        saveBtn.disabled = false;
+        btn.disabled = false; btn.innerText = 'Save Trade';
     }
 }
 
-// --- TRADE LOGS ---
+// --- LOGS & CHART UTILS ---
 async function loadLogs() {
     await fetchTrades();
     renderLogsTable();
 }
-
 function renderLogsTable() {
     const tbody = document.getElementById('trade-table-body');
     tbody.innerHTML = '';
+    const sess = document.getElementById('filter-session').value;
+    const out = document.getElementById('filter-outcome').value;
     
-    const sessionFilter = document.getElementById('filter-session').value;
-    const outcomeFilter = document.getElementById('filter-outcome').value;
-
     const filtered = allTrades.filter(t => {
-        const sessionMatch = sessionFilter === 'all' || t.session === sessionFilter;
-        const outcomeMatch = outcomeFilter === 'all' || t.trade_outcome === outcomeFilter;
-        return sessionMatch && outcomeMatch;
+        return (sess === 'all' || t.session === sess) && (out === 'all' || t.trade_outcome === out);
     });
 
-    filtered.forEach(trade => {
+    filtered.forEach(t => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${new Date(trade.trade_datetime).toLocaleDateString()}</td>
-            <td><strong>${trade.symbol}</strong> <span style="font-size:0.8em; color:var(--text-muted)">${trade.direction}</span></td>
-            <td>${trade.session}</td>
-            <td>${trade.liquidity_type || '-'}</td>
-            <td class="${trade.trade_outcome === 'Win' ? 'win' : trade.trade_outcome === 'Loss' ? 'loss' : ''}">${trade.trade_outcome}</td>
-            <td class="${(trade.profit_loss || 0) >= 0 ? 'win' : 'loss'}">$${parseFloat(trade.profit_loss || 0).toFixed(2)}</td>
-            <td>${trade.followed_plan ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-danger">No</span>'}</td>
-            <td>
-                <button onclick="editTrade('${trade.id}')" class="btn-secondary" style="padding:0.25rem 0.5rem">Edit</button>
-            </td>
+            <td>${new Date(t.trade_datetime).toLocaleDateString()}</td>
+            <td>${t.symbol}<br><small>${t.direction}</small></td>
+            <td>${t.session}</td>
+            <td class="${t.trade_outcome === 'Win' ? 'win' : t.trade_outcome === 'Loss' ? 'loss' : ''}">${t.trade_outcome}</td>
+            <td class="${(t.profit_loss||0)>=0?'win':'loss'}">$${parseFloat(t.profit_loss||0).toFixed(2)}</td>
+            <td>${t.followed_plan ? '<span class="badge-success">Yes</span>' : '<span class="badge-danger">No</span>'}</td>
+            <td><button class="btn-secondary" onclick="editTrade('${t.id}')">Edit</button></td>
         `;
         tbody.appendChild(tr);
     });
 }
-
 function editTrade(id) {
-    const trade = allTrades.find(t => t.id === id);
-    if (!trade) return;
-
-    // Populate Form
-    document.getElementById('trade-id').value = trade.id;
-    document.getElementById('trade_datetime').value = new Date(trade.trade_datetime).toISOString().slice(0, 16);
-    document.getElementById('session').value = trade.session;
-    document.getElementById('symbol').value = trade.symbol;
-    document.getElementById('direction').value = trade.direction;
-    document.getElementById('entry_price').value = trade.entry_price;
-    document.getElementById('stop_loss').value = trade.stop_loss;
-    document.getElementById('risk_amount').value = trade.risk_amount;
-    document.getElementById('profit_loss').value = trade.profit_loss;
-    document.getElementById('trade_outcome').value = trade.trade_outcome;
-    
-    document.getElementById('liquidity_type').value = trade.liquidity_type;
-    document.getElementById('check_htf_imbalance_ob').checked = trade.check_htf_imbalance_ob;
-    document.getElementById('check_double_bos').checked = trade.check_double_bos;
-    document.getElementById('check_ltf_poi_sl').checked = trade.check_ltf_poi_sl;
-    
-    document.getElementById('emotional_state').value = trade.emotional_state;
-    document.getElementById('notes').value = trade.notes;
-
+    const t = allTrades.find(x => x.id === id);
+    if(!t) return;
+    document.getElementById('trade-id').value = t.id;
+    document.getElementById('trade_datetime').value = new Date(t.trade_datetime).toISOString().slice(0, 16);
+    document.getElementById('session').value = t.session;
+    document.getElementById('symbol').value = t.symbol;
+    document.getElementById('direction').value = t.direction;
+    document.getElementById('trade_outcome').value = t.trade_outcome;
+    document.getElementById('profit_loss').value = t.profit_loss;
+    document.getElementById('liquidity_type').value = t.liquidity_type;
+    document.getElementById('check_htf_imbalance_ob').checked = t.check_htf_imbalance_ob;
+    document.getElementById('check_double_bos').checked = t.check_double_bos;
+    document.getElementById('check_ltf_poi_sl').checked = t.check_ltf_poi_sl;
     calculatePlanAdherence();
     
-    // Show Form
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
     document.getElementById('trade-form-section').classList.remove('hidden');
     document.getElementById('form-title').innerText = 'Edit Trade';
 }
-
-// --- REVIEW & ANALYTICS ---
-async function loadReview() {
-    await fetchTrades();
-    const trades = allTrades.filter(t => t.trade_outcome === 'Win' || t.trade_outcome === 'Loss'); // Only closed trades
-
-    // 1. Plan Adherence Chart
-    const planFollowed = trades.filter(t => t.followed_plan);
-    const planBroken = trades.filter(t => !t.followed_plan);
-    
-    const wrFollowed = planFollowed.length ? (planFollowed.filter(t => t.trade_outcome === 'Win').length / planFollowed.length * 100) : 0;
-    const wrBroken = planBroken.length ? (planBroken.filter(t => t.trade_outcome === 'Win').length / planBroken.length * 100) : 0;
-
-    createBarChart('plan adherenceChart', ['Followed Plan', 'Did Not Follow'], [wrFollowed, wrBroken], 'Win Rate %');
-    
-    document.getElementById('plan-insight').innerText = `You have a ${wrFollowed.toFixed(1)}% Win Rate when following the plan, vs ${wrBroken.toFixed(1)}% when breaking it.`;
-
-    // 2. Session Chart (P&L)
-    const sessions = ['Asian', 'London', 'New York'];
-    const sessionPnl = sessions.map(s => {
-        return trades.filter(t => t.session === s).reduce((sum, t) => sum + (parseFloat(t.profit_loss)||0), 0);
-    });
-    createBarChart('sessionChart', sessions, sessionPnl, 'Net P&L ($)');
-
-    // 3. Liquidity Type Chart (Win Rate)
-    const indTrades = trades.filter(t => t.liquidity_type === 'Inducement');
-    const engTrades = trades.filter(t => t.liquidity_type === 'Engineered');
-    
-    const indWr = indTrades.length ? (indTrades.filter(t => t.trade_outcome === 'Win').length / indTrades.length * 100) : 0;
-    const engWr = engTrades.length ? (engTrades.filter(t => t.trade_outcome === 'Win').length / engTrades.length * 100) : 0;
-    
-    createBarChart('liquidityChart', ['Inducement', 'Engineered'], [indWr, engWr], 'Win Rate %');
-
-    // 4. Emotion Chart
-    const emotions = [...new Set(trades.map(t => t.emotional_state))].filter(Boolean);
-    const emotionPnl = emotions.map(e => {
-        return trades.filter(t => t.emotional_state === e).reduce((sum, t) => sum + (parseFloat(t.profit_loss)||0), 0);
-    });
-    createBarChart('emotionChart', emotions, emotionPnl, 'Net P&L ($)');
+function destroyChart(id) {
+    if(charts[id]) { charts[id].destroy(); charts[id] = null; }
 }
 
-function createBarChart(canvasId, labels, data, label) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    if (charts[canvasId]) charts[canvasId].destroy();
+// --- REVIEW ---
+async function loadReview() {
+    await fetchTrades();
+    const trades = allTrades.filter(t => t.trade_outcome === 'Win' || t.trade_outcome === 'Loss');
+    
+    // Plan Chart
+    const yes = trades.filter(t => t.followed_plan);
+    const no = trades.filter(t => !t.followed_plan);
+    const wrYes = yes.length ? (yes.filter(t=>t.trade_outcome==='Win').length/yes.length*100) : 0;
+    const wrNo = no.length ? (no.filter(t=>t.trade_outcome==='Win').length/no.length*100) : 0;
+    
+    document.getElementById('plan-insight').innerText = `Followed Plan WR: ${wrYes.toFixed(0)}% vs Broken Plan WR: ${wrNo.toFixed(0)}%`;
+    
+    renderBar('plan adherenceChart', ['Followed', 'Broken'], [wrYes, wrNo], 'Win Rate %');
 
-    const colors = data.map(val => val >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)');
+    // Session Chart
+    const sessions = ['Asian', 'London', 'New York'];
+    const pnl = sessions.map(s => trades.filter(t=>t.session===s).reduce((a,b)=>a+(parseFloat(b.profit_loss)||0),0));
+    renderBar('sessionChart', sessions, pnl, 'P&L ($)');
+}
 
-    charts[canvasId] = new Chart(ctx, {
+function renderBar(id, labels, data, label) {
+    destroyChart(id);
+    const ctx = document.getElementById(id).getContext('2d');
+    const colors = data.map(v => v>=0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)');
+    charts[id] = new Chart(ctx, {
         type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: label,
-                data: data,
-                backgroundColor: colors,
-                borderColor: colors.map(c => c.replace('0.6', '1')),
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#334155' } },
-                x: { grid: { display: false } }
-            }
-        }
+        data: { labels, datasets: [{ label, data, backgroundColor: colors }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#334155' } }, x: { grid: { display: false } } } }
     });
 }

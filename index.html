@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ICT Trading Journal</title>
     <link rel="stylesheet" href="style.css">
     <!-- Chart.js -->
@@ -19,6 +19,7 @@
         <div class="auth-box">
             <h1>ICT Journal</h1>
             <p>Smart Money Concepts Tracking</p>
+            <div id="auth-error" class="error-msg hidden"></div>
             <div class="form-group">
                 <label>Email</label>
                 <input type="email" id="email" placeholder="trader@example.com">
@@ -27,18 +28,25 @@
                 <label>Password</label>
                 <input type="password" id="password" placeholder="••••••••">
             </div>
-            <button id="login-btn" class="btn-primary">Sign In</button>
-            <button id="signup-btn" class="btn-secondary">Sign Up</button>
-            <p id="auth-msg"></p>
+            <div class="auth-buttons">
+                <button id="login-btn" class="btn-primary">Sign In</button>
+                <button id="signup-btn" class="btn-secondary">Sign Up</button>
+            </div>
         </div>
     </div>
 
-    <!-- MAIN APP CONTAINER (Hidden until logged in) -->
+    <!-- MAIN APP CONTAINER -->
     <div id="app-container" class="hidden">
         
+        <!-- MOBILE HEADER -->
+        <header class="mobile-header">
+            <div class="brand">ICT Journal</div>
+            <button id="mobile-menu-btn"><i data-feather="menu"></i></button>
+        </header>
+
         <!-- SIDEBAR -->
-        <nav class="sidebar">
-            <div class="brand">
+        <nav class="sidebar" id="sidebar">
+            <div class="brand-desktop">
                 <h2>ICT Journal</h2>
                 <span id="user-email-display"></span>
             </div>
@@ -59,7 +67,7 @@
             
             <!-- DASHBOARD SECTION -->
             <section id="dashboard" class="view-section active">
-                <header>
+                <header class="section-header">
                     <h1>Dashboard</h1>
                     <div class="date-display" id="current-date"></div>
                 </header>
@@ -86,14 +94,16 @@
                 <div class="charts-row">
                     <div class="card chart-card wide">
                         <h3>Cumulative P&L</h3>
-                        <canvas id="pnlChart"></canvas>
+                        <div class="chart-container-responsive">
+                            <canvas id="pnlChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- TRADE LOGS SECTION -->
             <section id="logs" class="view-section hidden">
-                <header>
+                <header class="section-header">
                     <h1>Trade Logs</h1>
                     <div class="filters">
                         <select id="filter-session" onchange="renderLogsTable()">
@@ -116,8 +126,7 @@
                                 <th>Date</th>
                                 <th>Symbol</th>
                                 <th>Session</th>
-                                <th>Setup</th>
-                                <th>Result</th>
+                                <th>Outcome</th>
                                 <th>P&L</th>
                                 <th>Plan?</th>
                                 <th>Actions</th>
@@ -130,37 +139,32 @@
                 </div>
             </section>
 
-            <!-- REVIEW / ANALYTICS SECTION -->
+            <!-- REVIEW SECTION -->
             <section id="review" class="view-section hidden">
-                <header>
-                    <h1>Comprehensive Review</h1>
+                <header class="section-header">
+                    <h1>Analytics</h1>
                 </header>
                 
                 <div class="analytics-grid">
                     <div class="card chart-card">
-                        <h3>Plan Adherence Impact</h3>
-                        <p class="subtitle">Win Rate: Following Plan vs Not</p>
-                        <canvas id="plan adherenceChart"></canvas>
+                        <h3>Plan Adherence</h3>
+                        <div class="chart-container-responsive">
+                            <canvas id="plan adherenceChart"></canvas>
+                        </div>
                         <div id="plan-insight" class="insight-box"></div>
                     </div>
                     <div class="card chart-card">
-                        <h3>Session Performance</h3>
-                        <canvas id="sessionChart"></canvas>
-                    </div>
-                    <div class="card chart-card">
-                        <h3>Liquidity Type Efficiency</h3>
-                        <canvas id="liquidityChart"></canvas>
-                    </div>
-                    <div class="card chart-card">
-                        <h3>Emotional Impact</h3>
-                        <canvas id="emotionChart"></canvas>
+                        <h3>Session P&L</h3>
+                        <div class="chart-container-responsive">
+                            <canvas id="sessionChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- STRATEGY EDITOR SECTION -->
+            <!-- STRATEGY SECTION -->
             <section id="strategy" class="view-section hidden">
-                <header>
+                <header class="section-header">
                     <h1>My ICT Strategy</h1>
                     <button onclick="saveStrategy()" class="btn-primary">Save Strategy</button>
                 </header>
@@ -169,25 +173,27 @@
                 </div>
             </section>
 
-            <!-- NEW TRADE / EDIT TRADE FORM (Initially Hidden) -->
+            <!-- TRADE FORM (NEW/EDIT) -->
             <section id="trade-form-section" class="view-section hidden">
-                <header>
-                    <h1 id="form-title">New Trade Entry</h1>
+                <header class="section-header">
+                    <h1 id="form-title">New Trade</h1>
                     <button onclick="cancelTradeForm()" class="btn-secondary">Cancel</button>
                 </header>
                 
                 <form id="trade-form" onsubmit="handleTradeSubmit(event)">
-                    <input type="hidden" id="trade-id"> <!-- For editing -->
+                    <input type="hidden" id="trade-id">
 
-                    <!-- 1. The Setup (Left Column) -->
+                    <!-- Setup Details -->
                     <div class="form-grid">
                         <div class="card form-card">
-                            <h3>Trade Details</h3>
+                            <h3>Details</h3>
                             <div class="row">
                                 <div class="group">
-                                    <label>Date & Time</label>
+                                    <label>Date</label>
                                     <input type="datetime-local" id="trade_datetime" required>
                                 </div>
+                            </div>
+                            <div class="row">
                                 <div class="group">
                                     <label>Session</label>
                                     <select id="session" required>
@@ -196,77 +202,63 @@
                                         <option value="New York">New York</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="row">
                                 <div class="group">
                                     <label>Symbol</label>
                                     <input type="text" id="symbol" placeholder="EURUSD" required>
                                 </div>
+                            </div>
+                            <div class="row">
                                 <div class="group">
-                                    <label>Direction</label>
+                                    <label>Dir</label>
                                     <select id="direction">
                                         <option value="Long">Long</option>
                                         <option value="Short">Short</option>
                                     </select>
                                 </div>
+                                <div class="group">
+                                    <label>Result</label>
+                                    <select id="trade_outcome">
+                                        <option value="Open">Open</option>
+                                        <option value="Win">Win</option>
+                                        <option value="Loss">Loss</option>
+                                        <option value="Breakeven">BE</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="row">
                                 <div class="group">
-                                    <label>Entry Price</label>
-                                    <input type="number" step="0.00001" id="entry_price" required>
-                                </div>
-                                <div class="group">
-                                    <label>Stop Loss</label>
-                                    <input type="number" step="0.00001" id="stop_loss" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="group">
-                                    <label>Risk ($)</label>
-                                    <input type="number" step="0.01" id="risk_amount">
-                                </div>
-                                <div class="group">
-                                    <label>Target P&L ($)</label>
+                                    <label>P&L ($)</label>
                                     <input type="number" step="0.01" id="profit_loss">
                                 </div>
                             </div>
-                            <div class="group">
-                                <label>Outcome</label>
-                                <select id="trade_outcome">
-                                    <option value="Open">Open / Pending</option>
-                                    <option value="Win">Win</option>
-                                    <option value="Loss">Loss</option>
-                                    <option value="Breakeven">Breakeven</option>
-                                </select>
-                            </div>
                         </div>
 
-                        <!-- 2. Strategy Checklist (Right Column) -->
+                        <!-- Checklist -->
                         <div class="card form-card checklist-card">
-                            <h3>ICT Strategy Compliance</h3>
+                            <h3>ICT Compliance</h3>
                             
                             <div class="checklist-item">
-                                <label>1. HTF Liquidity Target</label>
+                                <label>1. Liquidity Type</label>
                                 <select id="liquidity_type" onchange="calculatePlanAdherence()">
-                                    <option value="">-- Select Liquidity --</option>
-                                    <option value="Inducement">Inducement Liquidity</option>
-                                    <option value="Engineered">Engineered Liquidity</option>
+                                    <option value="">-- Select --</option>
+                                    <option value="Inducement">Inducement</option>
+                                    <option value="Engineered">Engineered</option>
                                 </select>
                             </div>
 
                             <div class="checklist-item checkbox">
                                 <input type="checkbox" id="check_htf_imbalance_ob" onchange="calculatePlanAdherence()">
-                                <label for="check_htf_imbalance_ob">2. HTF Imbalance leads to OB?</label>
+                                <label for="check_htf_imbalance_ob">2. HTF Imbalance -> OB</label>
                             </div>
 
                             <div class="checklist-item checkbox">
                                 <input type="checkbox" id="check_double_bos" onchange="calculatePlanAdherence()">
-                                <label for="check_double_bos">3. LTF Double BoS Confirmed?</label>
+                                <label for="check_double_bos">3. Double BoS</label>
                             </div>
 
                             <div class="checklist-item checkbox">
                                 <input type="checkbox" id="check_ltf_poi_sl" onchange="calculatePlanAdherence()">
-                                <label for="check_ltf_poi_sl">4. LTF POI Refined & SL Placed?</label>
+                                <label for="check_ltf_poi_sl">4. Refined POI & SL</label>
                             </div>
 
                             <div id="plan-status-display" class="plan-status-fail">
@@ -275,40 +267,8 @@
                         </div>
                     </div>
 
-                    <!-- 3. Emotions & Screenshots -->
-                    <div class="form-grid">
-                        <div class="card form-card">
-                            <h3>Psychology & Notes</h3>
-                            <div class="group">
-                                <label>Emotional State</label>
-                                <select id="emotional_state">
-                                    <option value="Calm">Calm</option>
-                                    <option value="Confident">Confident</option>
-                                    <option value="Anxious">Anxious</option>
-                                    <option value="FOMO">FOMO</option>
-                                    <option value="Revenge">Revenge Trading</option>
-                                </select>
-                            </div>
-                            <div class="group">
-                                <label>Notes</label>
-                                <textarea id="notes" rows="4"></textarea>
-                            </div>
-                        </div>
-                        <div class="card form-card">
-                            <h3>Screenshots</h3>
-                            <div class="group">
-                                <label>HTF Analysis</label>
-                                <input type="file" id="file_htf" accept="image/*">
-                            </div>
-                            <div class="group">
-                                <label>LTF Entry</label>
-                                <input type="file" id="file_ltf" accept="image/*">
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="form-actions">
-                        <button type="submit" class="btn-primary" id="save-trade-btn">Save Trade Log</button>
+                        <button type="submit" class="btn-primary" id="save-trade-btn">Save Trade</button>
                     </div>
                 </form>
             </section>
@@ -316,20 +276,18 @@
         </main>
     </div>
 
-    <!-- STRATEGY REMINDER MODAL -->
+    <!-- STRATEGY MODAL -->
     <div id="strategy-modal" class="modal hidden">
         <div class="modal-content">
-            <h2>Review Your Plan</h2>
-            <div id="modal-strategy-text" class="strategy-read-only">
-                <!-- Strategy content loaded here -->
-            </div>
+            <h2>Review Plan</h2>
+            <div id="modal-strategy-text" class="strategy-read-only"></div>
             <div class="modal-check">
                 <input type="checkbox" id="confirm-strategy" onchange="toggleProceedBtn()">
-                <label for="confirm-strategy">I have reviewed my strategy and rules.</label>
+                <label for="confirm-strategy">I have reviewed my plan.</label>
             </div>
             <div class="modal-actions">
                 <button onclick="closeStrategyModal()" class="btn-secondary">Cancel</button>
-                <button id="btn-proceed" onclick="proceedToTradeForm()" class="btn-primary" disabled>Proceed to Log Trade</button>
+                <button id="btn-proceed" onclick="proceedToTradeForm()" class="btn-primary" disabled>Proceed</button>
             </div>
         </div>
     </div>
