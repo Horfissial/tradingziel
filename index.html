@@ -5,33 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ICT Trading Journal</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Feather Icons -->
+    <!-- Load Feather Icons First -->
     <script src="https://unpkg.com/feather-icons"></script>
+    <!-- Load Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Load Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <!-- AUTH SECTION -->
-    <div id="auth-container" class="active-section">
+    <!-- AUTH CONTAINER -->
+    <div id="auth-container">
         <div class="auth-box">
-            <h1>Tradeziel</h1>
-            <p>Trading Journal</p>
+            <h1>ICT Journal</h1>
+            <p>Smart Money Concepts</p>
+            
             <div id="auth-error" class="error-msg hidden"></div>
+            
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" id="email" placeholder="trader@example.com">
+                <input type="email" id="email" placeholder="trader@gmail.com">
             </div>
+            
             <div class="form-group">
                 <label>Password</label>
                 <input type="password" id="password" placeholder="••••••••">
             </div>
+            
             <div class="auth-buttons">
                 <button id="login-btn" class="btn-primary">Sign In</button>
                 <button id="signup-btn" class="btn-secondary">Sign Up</button>
             </div>
+            <p style="margin-top:15px; font-size: 0.8rem; color: #64748b; text-align: center;">
+                Check console logs if buttons don't work.
+            </p>
         </div>
     </div>
 
@@ -51,14 +58,14 @@
                 <span id="user-email-display"></span>
             </div>
             <ul class="nav-links">
-                <li class="nav-item active" onclick="showSection('dashboard')"><i data-feather="grid"></i> Dashboard</li>
-                <li class="nav-item" onclick="openNewTradeModal()"><i data-feather="plus-circle"></i> New Trade</li>
-                <li class="nav-item" onclick="showSection('logs')"><i data-feather="list"></i> Trade Logs</li>
-                <li class="nav-item" onclick="showSection('review')"><i data-feather="pie-chart"></i> Trade Review</li>
-                <li class="nav-item" onclick="showSection('strategy')"><i data-feather="book"></i> Strategy</li>
+                <li class="nav-item active" data-target="dashboard"><i data-feather="grid"></i> Dashboard</li>
+                <li class="nav-item" id="nav-new-trade"><i data-feather="plus-circle"></i> New Trade</li>
+                <li class="nav-item" data-target="logs"><i data-feather="list"></i> Trade Logs</li>
+                <li class="nav-item" data-target="review"><i data-feather="pie-chart"></i> Trade Review</li>
+                <li class="nav-item" data-target="strategy"><i data-feather="book"></i> Strategy</li>
             </ul>
             <div class="logout-container">
-                <button onclick="handleLogout()" class="btn-logout"><i data-feather="log-out"></i> Logout</button>
+                <button id="logout-btn" class="btn-logout"><i data-feather="log-out"></i> Logout</button>
             </div>
         </nav>
 
@@ -69,35 +76,16 @@
             <section id="dashboard" class="view-section active">
                 <header class="section-header">
                     <h1>Dashboard</h1>
-                    <div class="date-display" id="current-date"></div>
                 </header>
-                
                 <div class="stats-grid">
-                    <div class="card stat-card">
-                        <h3>Win Rate</h3>
-                        <p id="dash-winrate">0%</p>
-                    </div>
-                    <div class="card stat-card">
-                        <h3>Net P&L</h3>
-                        <p id="dash-pnl">$0.00</p>
-                    </div>
-                    <div class="card stat-card">
-                        <h3>Plan Adherence</h3>
-                        <p id="dash-adherence">0%</p>
-                    </div>
-                    <div class="card stat-card">
-                        <h3>Total Trades</h3>
-                        <p id="dash-total">0</p>
-                    </div>
+                    <div class="card stat-card"><h3>Win Rate</h3><p id="dash-winrate">0%</p></div>
+                    <div class="card stat-card"><h3>Net P&L</h3><p id="dash-pnl">$0.00</p></div>
+                    <div class="card stat-card"><h3>Plan Adherence</h3><p id="dash-adherence">0%</p></div>
+                    <div class="card stat-card"><h3>Trades</h3><p id="dash-total">0</p></div>
                 </div>
-
-                <div class="charts-row">
-                    <div class="card chart-card wide">
-                        <h3>Cumulative P&L</h3>
-                        <div class="chart-container-responsive">
-                            <canvas id="pnlChart"></canvas>
-                        </div>
-                    </div>
+                <div class="card chart-card wide">
+                    <h3>Cumulative P&L</h3>
+                    <div class="chart-box"><canvas id="pnlChart"></canvas></div>
                 </div>
             </section>
 
@@ -105,19 +93,6 @@
             <section id="logs" class="view-section hidden">
                 <header class="section-header">
                     <h1>Trade Logs</h1>
-                    <div class="filters">
-                        <select id="filter-session" onchange="renderLogsTable()">
-                            <option value="all">All Sessions</option>
-                            <option value="Asian">Asian</option>
-                            <option value="London">London</option>
-                            <option value="New York">New York</option>
-                        </select>
-                        <select id="filter-outcome" onchange="renderLogsTable()">
-                            <option value="all">All Outcomes</option>
-                            <option value="Win">Wins</option>
-                            <option value="Loss">Losses</option>
-                        </select>
-                    </div>
                 </header>
                 <div class="card table-container">
                     <table id="trade-table">
@@ -125,39 +100,29 @@
                             <tr>
                                 <th>Date</th>
                                 <th>Symbol</th>
-                                <th>Session</th>
-                                <th>Outcome</th>
+                                <th>Result</th>
                                 <th>P&L</th>
                                 <th>Plan?</th>
-                                <th>Actions</th>
+                                <th>Edit</th>
                             </tr>
                         </thead>
-                        <tbody id="trade-table-body">
-                            <!-- Populated by JS -->
-                        </tbody>
+                        <tbody id="trade-table-body"></tbody>
                     </table>
                 </div>
             </section>
 
             <!-- REVIEW SECTION -->
             <section id="review" class="view-section hidden">
-                <header class="section-header">
-                    <h1>Analytics</h1>
-                </header>
-                
+                <header class="section-header"><h1>Analytics</h1></header>
                 <div class="analytics-grid">
                     <div class="card chart-card">
-                        <h3>Plan Adherence</h3>
-                        <div class="chart-container-responsive">
-                            <canvas id="plan adherenceChart"></canvas>
-                        </div>
-                        <div id="plan-insight" class="insight-box"></div>
+                        <h3>Plan Adherence Win Rate</h3>
+                        <div class="chart-box"><canvas id="plan adherenceChart"></canvas></div>
+                        <div id="plan-insight" style="margin-top:10px; font-size:0.9rem; color:#94a3b8;"></div>
                     </div>
                     <div class="card chart-card">
                         <h3>Session P&L</h3>
-                        <div class="chart-container-responsive">
-                            <canvas id="sessionChart"></canvas>
-                        </div>
+                        <div class="chart-box"><canvas id="sessionChart"></canvas></div>
                     </div>
                 </div>
             </section>
@@ -165,133 +130,77 @@
             <!-- STRATEGY SECTION -->
             <section id="strategy" class="view-section hidden">
                 <header class="section-header">
-                    <h1>My ICT Strategy</h1>
-                    <button onclick="saveStrategy()" class="btn-primary">Save Strategy</button>
+                    <h1>Strategy</h1>
+                    <button id="save-strategy-btn" class="btn-primary" style="width: auto;">Save</button>
                 </header>
                 <div class="card">
-                    <textarea id="strategy-editor" placeholder="Write your full trading plan here..."></textarea>
+                    <textarea id="strategy-editor" placeholder="Write your trading plan here..."></textarea>
                 </div>
             </section>
 
-            <!-- TRADE FORM (NEW/EDIT) -->
+            <!-- TRADE FORM -->
             <section id="trade-form-section" class="view-section hidden">
                 <header class="section-header">
-                    <h1 id="form-title">New Trade</h1>
-                    <button onclick="cancelTradeForm()" class="btn-secondary">Cancel</button>
+                    <h1 id="form-title">Entry</h1>
+                    <button id="cancel-trade-btn" class="btn-secondary" style="width: auto;">Cancel</button>
                 </header>
                 
-                <form id="trade-form" onsubmit="handleTradeSubmit(event)">
+                <form id="trade-form">
                     <input type="hidden" id="trade-id">
-
-                    <!-- Setup Details -->
+                    
                     <div class="form-grid">
-                        <div class="card form-card">
+                        <div class="card">
                             <h3>Details</h3>
-                            <div class="row">
-                                <div class="group">
-                                    <label>Date</label>
-                                    <input type="datetime-local" id="trade_datetime" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="group">
-                                    <label>Session</label>
-                                    <select id="session" required>
-                                        <option value="Asian">Asian</option>
-                                        <option value="London">London</option>
-                                        <option value="New York">New York</option>
-                                    </select>
-                                </div>
-                                <div class="group">
-                                    <label>Symbol</label>
-                                    <input type="text" id="symbol" placeholder="EURUSD" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="group">
-                                    <label>Dir</label>
-                                    <select id="direction">
-                                        <option value="Long">Long</option>
-                                        <option value="Short">Short</option>
-                                    </select>
-                                </div>
-                                <div class="group">
-                                    <label>Result</label>
-                                    <select id="trade_outcome">
-                                        <option value="Open">Open</option>
-                                        <option value="Win">Win</option>
-                                        <option value="Loss">Loss</option>
-                                        <option value="Breakeven">BE</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="group">
-                                    <label>P&L ($)</label>
-                                    <input type="number" step="0.01" id="profit_loss">
-                                </div>
-                            </div>
+                            <label>Date</label><input type="datetime-local" id="trade_datetime" required>
+                            <label>Session</label>
+                            <select id="session"><option value="Asian">Asian</option><option value="London">London</option><option value="New York">New York</option></select>
+                            <label>Symbol</label><input type="text" id="symbol" placeholder="EURUSD">
+                            <label>Direction</label><select id="direction"><option value="Long">Long</option><option value="Short">Short</option></select>
+                            <label>Outcome</label><select id="trade_outcome"><option value="Open">Open</option><option value="Win">Win</option><option value="Loss">Loss</option><option value="Breakeven">BE</option></select>
+                            <label>P&L ($)</label><input type="number" step="0.01" id="profit_loss">
                         </div>
 
-                        <!-- Checklist -->
-                        <div class="card form-card checklist-card">
-                            <h3>ICT Compliance</h3>
+                        <div class="card checklist-card">
+                            <h3>ICT Checklist</h3>
+                            <label>1. Liquidity Type</label>
+                            <select id="liquidity_type">
+                                <option value="">-- Select --</option>
+                                <option value="Inducement">Inducement</option>
+                                <option value="Engineered">Engineered</option>
+                            </select>
                             
-                            <div class="checklist-item">
-                                <label>1. Liquidity Type</label>
-                                <select id="liquidity_type" onchange="calculatePlanAdherence()">
-                                    <option value="">-- Select --</option>
-                                    <option value="Inducement">Inducement</option>
-                                    <option value="Engineered">Engineered</option>
-                                </select>
-                            </div>
+                            <div class="chk-row"><input type="checkbox" id="check_htf_imbalance_ob"><label>2. HTF Imbalance/OB</label></div>
+                            <div class="chk-row"><input type="checkbox" id="check_double_bos"><label>3. Double BoS</label></div>
+                            <div class="chk-row"><input type="checkbox" id="check_ltf_poi_sl"><label>4. Refined POI/SL</label></div>
 
-                            <div class="checklist-item checkbox">
-                                <input type="checkbox" id="check_htf_imbalance_ob" onchange="calculatePlanAdherence()">
-                                <label for="check_htf_imbalance_ob">2. HTF Imbalance -> OB</label>
-                            </div>
-
-                            <div class="checklist-item checkbox">
-                                <input type="checkbox" id="check_double_bos" onchange="calculatePlanAdherence()">
-                                <label for="check_double_bos">3. Double BoS</label>
-                            </div>
-
-                            <div class="checklist-item checkbox">
-                                <input type="checkbox" id="check_ltf_poi_sl" onchange="calculatePlanAdherence()">
-                                <label for="check_ltf_poi_sl">4. Refined POI & SL</label>
-                            </div>
-
-                            <div id="plan-status-display" class="plan-status-fail">
-                                ✗ Plan Not Followed
-                            </div>
+                            <div id="plan-status-display" class="plan-status-fail">✗ Plan Not Followed</div>
                         </div>
                     </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary" id="save-trade-btn">Save Trade</button>
-                    </div>
+                    <br>
+                    <button type="submit" class="btn-primary" id="save-trade-btn">Save Trade</button>
                 </form>
             </section>
 
         </main>
     </div>
 
-    <!-- STRATEGY MODAL -->
+    <!-- MODAL -->
     <div id="strategy-modal" class="modal hidden">
         <div class="modal-content">
-            <h2>Review Plan</h2>
+            <h3>Review Plan</h3>
             <div id="modal-strategy-text" class="strategy-read-only"></div>
-            <div class="modal-check">
-                <input type="checkbox" id="confirm-strategy" onchange="toggleProceedBtn()">
-                <label for="confirm-strategy">I have reviewed my plan.</label>
+            <div class="chk-row" style="margin: 15px 0;">
+                <input type="checkbox" id="confirm-strategy">
+                <label>I have reviewed my plan.</label>
             </div>
             <div class="modal-actions">
-                <button onclick="closeStrategyModal()" class="btn-secondary">Cancel</button>
-                <button id="btn-proceed" onclick="proceedToTradeForm()" class="btn-primary" disabled>Proceed</button>
+                <button id="modal-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="btn-proceed" class="btn-primary" disabled>Proceed</button>
             </div>
         </div>
     </div>
 
+    <!-- SCRIPT LOADED LAST -->
     <script src="app.js"></script>
 </body>
 </html>
